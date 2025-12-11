@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: memory-leak-injector
+  namespace: default
+  labels:
+    chaos-scenario: memory-leak
+    target-service: petadoptionshistory-py
+spec:
+  template:
+    metadata:
+      labels:
+        chaos-scenario: memory-leak
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: memory-leak
+          image: python:3.11-slim
+          command:
+            - python
+            - -c
+            - |
+              import time
+              import sys
+              
+              print("Starting memory leak simulation...")
+              print("Target: petadoptionshistory-py")
+              print("Leak rate: 10MB every 60 seconds")
+              print("Max memory: 450MB")
+              
+              leaked_memory = []
+              current_mb = 0
+              max_mb = 450
+              leak_rate_mb = 10
+              
+              try:
+                  while current_mb < max_mb:
+                      # Allocate 10MB
+                      chunk = bytearray(leak_rate_mb * 1024 * 1024)
+                      for i in range(0, len(chunk), 4096):
+                          chunk[i] = 1
+                      leaked_memory.append(chunk)
+                      current_mb += leak_rate_mb
+                      
+                      print(f"Memory leaked: {current_mb} MB / {max_mb} MB")
+                      sys.stdout.flush()
+                      
+                      time.sleep(60)
+                  
+                  print(f"Max memory ({max_mb} MB) reached!")
+                  print("Holding memory for 5 minutes...")
+                  time.sleep(300)
+                  
+              except KeyboardInterrupt:
+                  print("Interrupted")
+              except Exception as e:
+                  print(f"Error: {e}")
+                  sys.exit(1)
+          
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "100m"
+            limits:
+              memory: "600Mi"
+              cpu: "200m"
+  
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
