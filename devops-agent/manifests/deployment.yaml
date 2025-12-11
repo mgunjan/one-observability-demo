@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-agent
+  namespace: devops-agent
+  labels:
+    app: devops-agent
+    version: v1.0.0
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: devops-agent
+  template:
+    metadata:
+      labels:
+        app: devops-agent
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: devops-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+        - name: agent
+          image: ${ECR_REGISTRY}/devops-agent:latest
+          imagePullPolicy: Always
+          
+          env:
+            - name: AWS_REGION
+              value: "${AWS_REGION}"
+            
+            - name: EKS_CLUSTER_NAME
+              value: "${EKS_CLUSTER_NAME}"
+            
+            - name: SLACK_CHANNEL
+              value: "${SLACK_CHANNEL}"
+            
+            - name: PROMETHEUS_MCP_URL
+              value: "http://prometheus-mcp-server.devops-agent.svc.cluster.local:8080"
+            
+            - name: GRAFANA_URL
+              value: "${GRAFANA_URL}"
+            
+            - name: EVENT_POLL_INTERVAL
+              value: "5"
+            
+            - name: MAX_CONCURRENT_EVENTS
+              value: "3"
+            
+            # Slack token from Secrets Manager (via IRSA)
+            - name: SLACK_SECRET_NAME
+              value: "devops-agent/slack-token"
+          
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+      
+      volumes:
+        - name: config
+          configMap:
+            name: devops-agent-config
+      
+      # Pod anti-affinity to avoid running multiple replicas on the same node
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - devops-agent
+                topologyKey: kubernetes.io/hostname

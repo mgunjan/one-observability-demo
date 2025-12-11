@@ -1,0 +1,29 @@
+# Web framework
+fastapi==0.108.0
+uvicorn==0.25.0
+pydantic==2.5.3
+
+# AWS SDK
+boto3==1.34.10
+botocore==1.34.10
+
+# Prometheus client
+prometheus-client==0.19.0
+
+# HTTP client with AWS SigV4 support
+requests==2.31.0
+requests-aws4auth==1.2.3
+aiohttp==3.9.1
+
+# Data processing
+pyyaml==6.0.1
+python-dateutil==2.8.2
+
+# NLP for query understanding
+spacy==3.7.2
+nltk==3.8.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.26.0
